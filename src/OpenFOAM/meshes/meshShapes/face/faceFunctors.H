@@ -1,4 +1,5 @@
 #include "vector.H"
+#include "intersection.H"
 
 namespace Foam
 {
@@ -158,4 +159,172 @@ struct faceSweptVolFunctor
     }
 };
 
+struct faceRayFunctor
+{
+    const point* meshPoints;
+    const intersection::algorithm alg;
+    const intersection::direction dir;
+
+    faceRayFunctor
+    (
+        const point* _meshPoints,
+        const intersection::algorithm _alg,
+        const intersection::direction _dir
+    ):
+        meshPoints(_meshPoints),
+        alg(_alg),
+        dir(_dir)
+    {}
+
+    __host__ __device__
+    pointHit operator()(const faceData& tgtFace, const point& p, const vector& n)
+    {
+        const label start = tgtFace.start();
+        const label nPoints = tgtFace.size();
+
+        // If the face is a triangle, do a direct calculation
+        if (nPoints == 3)
+        {
+            return triPointRef
+            (
+                meshPoints[start],
+                meshPoints[start + 1],
+                meshPoints[start + 2]
+            ).ray(p, n, alg, dir);
+        }
+
+        point ctr(0, 0, 0);
+        for (label i = 0; i < tgtFace.size(); i++)
+        {
+            ctr += meshPoints[start + i];
+        }
+        ctr /= tgtFace.size();
+
+        scalar nearestHitDist = GREAT;
+
+        scalar nearestMissDist = GREAT;
+        bool eligible = false;
+
+        // Initialize to miss, distance = GREAT
+        pointHit nearest(p);
+
+        point nextPoint = ctr;
+
+        for (label pI = 0; pI < nPoints; pI++)
+        {
+            nextPoint = meshPoints[start + (pI + 1) % nPoints];
+
+            // Note: for best accuracy, centre point always comes last
+            //
+            pointHit curHit = triPointRef
+            (
+                meshPoints[start + pI],
+                nextPoint,
+                ctr
+            ).ray(p, n, alg, dir);
+
+            if (curHit.hit())
+            {
+                if (Foam::mag(curHit.distance()) < Foam::mag(nearestHitDist))
+                {
+                    nearestHitDist = curHit.distance();
+                    nearest.setHit();
+                    nearest.setPoint(curHit.hitPoint());
+                }
+            }
+            else if (!nearest.hit())
+            {
+                // Miss and no hit yet. Update miss statistics.
+                if (curHit.eligibleMiss())
+                {
+                    eligible = true;
+
+                    // Miss distance is the distance between the plane intersection
+                    // point and the nearest point of the triangle
+                    scalar missDist =
+                        Foam::mag
+                        (
+                            p + curHit.distance()*n
+                            - curHit.missPoint()
+                        );
+
+                    if (missDist < nearestMissDist)
+                    {
+                        nearestMissDist = missDist;
+                        nearest.setDistance(curHit.distance());
+                        nearest.setPoint(curHit.missPoint());
+                    }
+                }
+            }
+        }
+
+        if (nearest.hit())
+        {
+            nearest.setDistance(nearestHitDist);
+        }
+        else
+        {
+            // Haven't hit a single face triangle
+            nearest.setMiss(eligible);
+        }
+
+        return nearest;
+    }
+};
+
+struct faceNormalFunctor
+{
+    const point* meshPoints;
+
+    faceNormalFunctor
+    (
+        const point* _meshPoints
+    ):
+        meshPoints(_meshPoints)
+    {}
+
+    __host__ __device__
+    vector operator()(const faceData& face)
+    {
+        const label start = face.start();
+        const label nPoints = face.size();
+
+        if (nPoints == 3)
+        {
+            return triPointRef
+            (
+                meshPoints[start],
+                meshPoints[start + 1],
+                meshPoints[start + 2]
+            ).normal();
+        }
+
+        label pI;
+
+        point centrePoint(0,0,0);
+        for (pI = 0; pI < nPoints; ++pI)
+        {
+            centrePoint += meshPoints[start + pI];
+        }
+        centrePoint /= nPoints;
+
+        vector n(0,0,0);
+
+        point nextPoint = centrePoint;
+
+        for (pI = 0; pI < nPoints; ++pI)
+        {
+            nextPoint = meshPoints[start + (pI + 1) % nPoints];
+
+            n += triPointRef
+            (
+                meshPoints[start + pI],
+                nextPoint,
+                centrePoint
+            ).normal();
+        }
+
+        return n;
+    }
+};
 }

@@ -194,6 +194,7 @@ public:
             //  In case of miss pointHit is set to nearest point
             //  on triangle and its distance to the distance between
             //  the original point and the plane intersection point
+            __HOST____DEVICE__
             inline pointHit ray
             (
                 const point& p,
@@ -207,6 +208,7 @@ public:
             //  intersection=p+t*q. Only defined for VISIBLE, FULL_RAY or
             //  HALF_RAY. tol increases the virtual size of the triangle
             // by a relative factor.
+            __HOST____DEVICE__
             inline pointHit intersection
             (
                 const point& p,
@@ -220,6 +222,7 @@ public:
             //  + near edge (nearType=EDGE, nearLabel=0, 1, 2)
             //    Note: edges are counted from starting
             //    vertex so e.g. edge 2 is from f[2] to f[0]
+            __HOST____DEVICE__
             pointHit nearestPointClassify
             (
                 const point& p,
@@ -228,6 +231,7 @@ public:
             ) const;
 
             //- Return nearest point to p on triangle
+            __HOST____DEVICE__
             inline pointHit nearestPoint(const point& p) const;
 
             //- Classify nearest point to p in triangle plane

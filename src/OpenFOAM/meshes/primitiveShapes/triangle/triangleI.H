@@ -320,6 +320,7 @@ Foam::scalar Foam::triangle<Point, PointRef>::barycentric
 
 
 template<class Point, class PointRef>
+__HOST____DEVICE__
 inline Foam::pointHit Foam::triangle<Point, PointRef>::ray
 (
     const point& p,
@@ -398,7 +399,12 @@ inline Foam::pointHit Foam::triangle<Point, PointRef>::ray
                 Foam::mag(E1)
             ),
             Foam::mag(c_ - b_)
-        )*intersection::planarTol();
+        )*
+        #ifndef __CUDA_ARCH__
+            intersection::planarTol();
+        #else
+            0.2;
+        #endif
 
     bool eligible =
         alg == intersection::FULL_RAY
@@ -436,6 +442,7 @@ inline Foam::pointHit Foam::triangle<Point, PointRef>::ray
 // From "Fast, Minimum Storage Ray/Triangle Intersection"
 // Moeller/Trumbore.
 template<class Point, class PointRef>
+__HOST____DEVICE__
 inline Foam::pointHit Foam::triangle<Point, PointRef>::intersection
 (
     const point& orig,
@@ -454,7 +461,7 @@ inline Foam::pointHit Foam::triangle<Point, PointRef>::intersection
     const scalar det = edge1 & pVec;
 
     // Initialise to miss
-    pointHit intersection(false, vector::zero, GREAT, false);
+    pointHit intersection(false, vector(0,0,0), GREAT, false);
 
     if (alg == intersection::VISIBLE)
     {
@@ -519,6 +526,7 @@ inline Foam::pointHit Foam::triangle<Point, PointRef>::intersection
 
 
 template<class Point, class PointRef>
+__HOST____DEVICE__
 Foam::pointHit Foam::triangle<Point, PointRef>::nearestPointClassify
 (
     const point& p,
@@ -668,6 +676,7 @@ Foam::pointHit Foam::triangle<Point, PointRef>::nearestPointClassify
 
 
 template<class Point, class PointRef>
+__HOST____DEVICE__
 inline Foam::pointHit Foam::triangle<Point, PointRef>::nearestPoint
 (
     const point& p

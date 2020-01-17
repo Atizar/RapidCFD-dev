@@ -117,7 +117,7 @@ private:
 
         //- Reference to global list of points
         PointField points_;
-
+        mutable gpuField<PointType>* gpuPointsPtr_;
 
     // Demand driven private data
 
@@ -307,6 +307,14 @@ public:
             return points_;
         }
 
+        const gpuField<PointType>& getPoints() const
+        {
+            if (!gpuPointsPtr_)
+            {
+                gpuPointsPtr_ = new gpuField<PointType>(points_);
+            }
+            return *gpuPointsPtr_;
+        }
 
     // Access functions for demand driven data
 
